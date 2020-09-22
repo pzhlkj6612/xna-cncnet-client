@@ -173,8 +173,12 @@ namespace DTAClient.Online
                     {
                         connectionManager.OnAttemptedServerChanged(server.Name);
 
-                        TcpClient client = new TcpClient(AddressFamily.InterNetworkV6);
-                        client.Client.DualMode = true;
+                        TcpClient client = new TcpClient();
+
+                        // For versions below .NET Framework 4.5, there is no 'Socket.DualMode' property.
+                        client.Client = new Socket(AddressFamily.InterNetworkV6, SocketType.Stream, ProtocolType.Tcp);
+                        client.Client.SetSocketOption(SocketOptionLevel.IPv6, SocketOptionName.IPv6Only, false);
+
                         var result = client.BeginConnect(server.Host, server.Ports[i], null, null);
                         result.AsyncWaitHandle.WaitOne(TimeSpan.FromSeconds(3), false);
 
@@ -384,7 +388,18 @@ namespace DTAClient.Online
                                 {
                                     long pingInMs = pingReply.RoundtripTime;
                                     Logger.Log($"The latency in milliseconds to the server {serverName} ({serverIPAddress}): {pingInMs}.");
-                                    availableServerAndLatencyDict.Add(new Server(serverIPAddress.ToString(), serverName, serverPorts), pingInMs);
+
+                                    /*
+                                     * For versions below .NET Framework 4.5, there is no 'IPAddress.MapToIPv6()' method.
+                                     *   We need to map the IPv4 address to IPv6 manually.
+                                     * The method 'Ping.Send()' cannot identify the mapped address (e.g., '::FFFF:1.1.1.1'),
+                                     *   so we will do the mapping after the latency test.
+                                     */
+                                    string ipAddress = serverIPAddress.ToString();
+                                    if (serverIPAddress.AddressFamily == AddressFamily.InterNetwork)
+                                        ipAddress = "::FFFF:" + ipAddress;
+
+                                    availableServerAndLatencyDict.Add(new Server(ipAddress, serverName, serverPorts), pingInMs);
                                 }
                                 else
                                 {
