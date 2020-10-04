@@ -365,7 +365,8 @@ namespace DTAClient.Online
                         List<IPAddress> serverIPAddresses = Dns.GetHostAddresses(serverHostnameOrIPAddress)
                             .Where(item => item.AddressFamily == AddressFamily.InterNetwork).ToList();
 #else
-                        List<IPAddress> serverIPAddresses = Dns.GetHostAddresses(serverHostnameOrIPAddress).ToList();
+                        List<IPAddress> serverIPAddresses = Dns.GetHostAddresses(serverHostnameOrIPAddress)
+                            .OrderBy(item => item.AddressFamily).ToList(); // IPv4 takes precedence.
 #endif
 
                         Logger.Log($"DNS resolved {serverName} ({serverHostnameOrIPAddress}): " +
