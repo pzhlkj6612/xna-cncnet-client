@@ -162,9 +162,9 @@ namespace DTAClient.Online
         /// </summary>
         private void ConnectToServer()
         {
-            IEnumerable<Server> availableServerSortedList = GetAvailableServerList();
+            IEnumerable<Server> serverSortedList = GetServerSortedByLatencyList();
 
-            foreach (Server server in availableServerSortedList)
+            foreach (Server server in serverSortedList)
             {
                 try
                 {
@@ -328,12 +328,13 @@ namespace DTAClient.Online
         /// <summary>
         /// Get all IP addresses of Lobby servers by resolving the hostname and test the latency to the servers.
         /// The maximum latency is defined in <c>MAXIMUM_LATENCY</c>, see <see cref="Connection.MAXIMUM_LATENCY"/>.
+        /// Servers that did not respond to ICMP messages in time will be placed at the end of the list.
         /// </summary>
-        /// <returns>A list of available Lobby servers sorted by latency.</returns>
-        private IEnumerable<Server> GetAvailableServerList()
+        /// <returns>A list of all Lobby servers sorted by latency.</returns>
+        private IEnumerable<Server> GetServerSortedByLatencyList()
         {
             List<string> triedIPAddressList = new List<string>();
-            Dictionary<Server, long> availableServerAndLatencyDict = new Dictionary<Server, long>();
+            Dictionary<Server, long> serverAndLatencyDict = new Dictionary<Server, long>();
 
             try
             {
@@ -378,17 +379,19 @@ namespace DTAClient.Online
                             {
                                 Logger.Log($"Attempting to ping {serverName} ({serverIPAddress}).");
                                 PingReply pingReply = new Ping().Send(serverIPAddress, MAXIMUM_LATENCY);
+                                Server currentServer = new Server(serverIPAddress.ToString(), serverName, serverPorts);
 
                                 if (pingReply.Status == IPStatus.Success)
                                 {
                                     long pingInMs = pingReply.RoundtripTime;
                                     Logger.Log($"The latency in milliseconds to the server {serverName} ({serverIPAddress}): {pingInMs}.");
-                                    availableServerAndLatencyDict.Add(new Server(serverIPAddress.ToString(), serverName, serverPorts), pingInMs);
+                                    serverAndLatencyDict.Add(currentServer, pingInMs);
                                 }
                                 else
                                 {
                                     Logger.Log($"Failed to ping the server {serverName} ({serverIPAddress}): " +
                                         $"{Enum.GetName(typeof(IPStatus), pingReply.Status)}.");
+                                    serverAndLatencyDict.Add(currentServer, MAXIMUM_LATENCY);
                                 }
                             });
 
@@ -418,9 +421,9 @@ namespace DTAClient.Online
                 }
             }
 
-            Logger.Log($"The number of available Lobby servers is {availableServerAndLatencyDict.Count}.");
+            Logger.Log($"The number of Lobby servers is {serverAndLatencyDict.Count}.");
 
-            return availableServerAndLatencyDict.OrderBy(item => item.Value).Select(item => item.Key);
+            return serverAndLatencyDict.OrderBy(item => item.Value).Select(item => item.Key);
         }
 
         public void Disconnect()
